@@ -24,6 +24,7 @@ otrpass = os.environ.get('OTR_PASS')
 loglevel = os.environ.get('LOG_LEVEL')
 waitseconds = safe_cast(os.environ.get('DECODE_INTERVAL'),int, 600)
 subfolders = safe_cast(os.environ.get('USE_DEST_SUBFOLDER'), bool, False)
+usecutlists = safe_cast(os.environ.get('USE_CUTLIST'), bool, True)
 
 """ Logging Configuration ----------------------------------------------------------------------------------------------- 
 """    
@@ -150,9 +151,11 @@ def do_otrkeydecode():
             if os.path.exists(otrdecoder):
                 
                 call = otrdecoder + ' -i ' + sourceful + ' -o ' + destful + ' -e ' + otruser + ' -p ' + otrpass + ' -f'
-                cutlist = get_cutlist(file,sourcepath)
-                if not cutlist is None:
-                    call = call + ' -C ' + cutlist
+                
+                if usecutlists:
+                    cutlist = get_cutlist(file,sourcepath)
+                    if not cutlist is None:
+                        call = call + ' -C ' + cutlist
                 
                 log.debug('decode call: {} !'.format(call))
 
@@ -164,6 +167,7 @@ def do_otrkeydecode():
                 """
                 log.debug('returncode: {!s}'.format(decode.returncode))
                 if decode.returncode == 0:
+                    log.debug('Decoding succesfull with returncode {!s}. Try to delete otrkey file and cutlist!'.format(decode.returncode))
                     os.remove(sourceful)
                     if not cutlist is None:
                         os.remove(cutlist)

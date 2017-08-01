@@ -9,16 +9,7 @@ ENV OTR_PASS supersecret
 ENV LOG_LEVEL DEBUG
 ENV DECODE_INTERVAL 600
 ENV USE_DEST_SUBFOLDER True
-
-
-# try otrdecoder standard
-# http://www.onlinetvrecorder.com/downloads/otrdecoder-bin-i686-pc-linux-gnu-static-0.4.592.tar.bz2 ;-(
-# http://www.onlinetvrecorder.com/downloads/otrdecoder-bin-i686-pc-linux-gnu-static-0.4.995.tar.bz2 <-
-# http://www.onlinetvrecorder.com/downloads/otrdecoder-bin-linux-Ubuntu_9.04-i686-0.4.592.tar.bz2 ;-(
-
-# try otrdecoder easy
-# http://www.onlinetvrecorder.com/downloads/otrdecoder-bin-x86_64-unknown-linux-gnu-0.4.1132.tar.bz2 ;-(
-# http://www.onlinetvrecorder.com/downloads/otrdecoder-bin-linux-Ubuntu_8.04-i686-0.4.1132.tar.bz2  ;-(
+ENV USE_CUTLIST True
 
 # dirs & volumes
 # --------------------------------------------------------
@@ -55,7 +46,7 @@ COPY . /usr/src/
 RUN pip install --no-cache-dir -r /usr/src/requirements.txt
 
 # volumes
-VOLUME /usr/src/
+#VOLUME /usr/src/
 VOLUME /usr/log/
 VOLUME /usr/otrkey/
 VOLUME /usr/video/
