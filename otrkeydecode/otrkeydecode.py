@@ -153,7 +153,7 @@ def do_otrkeydecode():
                 call = otrdecoder + ' -i ' + sourceful + ' -o ' + destful + ' -e ' + otruser + ' -p ' + otrpass + ' -f'
                 
                 if usecutlists:
-                    cutlist = get_cutlist(file,sourcepath)
+                    cutlist = get_cutlist(file)
                     if not cutlist is None:
                         call = call + ' -C ' + cutlist
                 
