@@ -14,7 +14,11 @@ import configparser
 """ helper """
 def safe_cast(val, to_type, default=None):
     try:
-        return to_type(val)
+        if val is None:
+            return default
+        else:
+            return to_type(val)
+        
     except (ValueError, TypeError):
         return default
 
