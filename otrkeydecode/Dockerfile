@@ -46,10 +46,11 @@ COPY . /usr/src/
 RUN pip install --no-cache-dir -r /usr/src/requirements.txt
 
 # volumes
-#VOLUME /usr/src/
+VOLUME /usr/src/
 VOLUME /usr/log/
 VOLUME /usr/otrkey/
 VOLUME /usr/video/
+VOLUME /tmp/
 
 # Start/Stop
 STOPSIGNAL SIGTERM
