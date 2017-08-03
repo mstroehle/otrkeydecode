@@ -2,7 +2,6 @@ import subprocess
 from datetime import datetime, timedelta
 import os
 from sys import stdout
-from shutil import copyfile
 
 import logging
 import logging.handlers
@@ -23,9 +22,13 @@ def safe_cast(val, to_type, default=None):
         return default
 
 stopsignal = False
+
 def handler_stop_signals(signum, frame):
     global stopsignal
     stopsignal = True
+
+signal.signal(signal.SIGINT, handler_stop_signals)
+signal.signal(signal.SIGTERM, handler_stop_signals)
 
 """ Logging Configuration """    
 loglevel = safe_cast(os.environ.get('LOG_LEVEL'), str, 'INFO')
@@ -96,7 +99,7 @@ class otrkey():
                 return cutlist_file
 
         except:
-            log.exception('Exception in def .{}'.format(__name__))
+            log.exception('Exception Traceback:')
             return None
 
     def get_videopath(self):
@@ -140,7 +143,7 @@ class otrkey():
                 return destful
 
         except:
-            log.exception('Exception in def {}'.format(__name__))
+            log.exception('Exception Traceback:')
             return self.destination_path
 
     def decode(self):
@@ -158,19 +161,19 @@ class otrkey():
                 
                 log.debug('decode call: {} !'.format(call))
 
-                decode = subprocess.Popen(call, shell=True, stdout=subprocess.PIPE)
-                decode.wait()
+                process = subprocess.Popen(call, shell=True, stdout=subprocess.PIPE)
+                process.wait()
         
                 """ decoding successful ? """
-                if decode.returncode != 0:
-                    log.error('decoding failed with code {!s} and output {!s}'.format(decode.returncode, decode.stdout.read()))
+                if process.returncode != 0:
+                    log.error('decoding failed with code {!s} and output {!s}'.format(process.returncode, process.stdout.read()))
                     
                 else:
-                    log.info('Decoding succesfull with returncode {!s}. Try to delete otrkey file and cutlist!'.format(decode.returncode))
+                    log.info('Decoding succesfull with returncode {!s}.'.format(process.returncode))
                     self.decoded = True
 
             except:
-                log.exception('Exception in def .{}'.format(__name__))
+                log.exception('Exception Traceback:')
 
     def move(self):
         """ move decoded videofile to destination """    
@@ -178,12 +181,21 @@ class otrkey():
             log.debug('try to move {} to {}'.format(self.video_temp_fullpath, self.video_fullpath))
         
             try:
-                copyfile(self.video_temp_fullpath, self.video_fullpath)
-                self.moved = True
+                process_call = 'mv ' + self.video_temp_fullpath + ' ' + self.video_fullpath
+                log.debug('moving file with linux call: {}'.format(process_call))
+                process = subprocess.Popen(process_call, shell=True, stdout=subprocess.PIPE)
+                process.wait()
+        
+                """ moving successful ? """
+                if process.returncode != 0:
+                    log.error('moving failed with code {!s} and output {!s}'.format(process.returncode, process.stdout.read()))
+                    
+                else:
+                    log.info('Moving succesfull with returncode {!s}.'.format(process.returncode))
+                    self.moved = True
             
             except:
-                log.exception('exception on {!s}'.format(__name__))
-                self.moved = False
+                log.exception('Exception Traceback:')
         
     def __init__(self, otrkey_file, data):
 
@@ -235,9 +247,6 @@ class otrkey():
 def main():
     log.info('otrkey decoder start main....')
 
-    signal.signal(signal.SIGINT, handler_stop_signals)
-    signal.signal(signal.SIGTERM, handler_stop_signals)
-
     config = config_module()
     nextrun =  datetime.utcnow()
 
@@ -255,7 +264,7 @@ def main():
 
                     with otrkey(file, config) as otrkey_file:
                         otrkey_file.decode()
-                        otrkey.move()
+                        otrkey_file.move()
 
             nextrun = datetime.utcnow() + timedelta(seconds=config['waitseconds'])
             log.info('next runtime in {!s} seconds at {!s}'.format(config['waitseconds'], nextrun))
