@@ -249,7 +249,7 @@ def main():
             """ loop all *.otrkey files in sourcefolder/volume  """ 
             log.info('run {!s}'.format(__name__))
 
-            for file in os.listdir(sourcepath): 
+            for file in os.listdir(config['source_path']): 
                 if file.endswith(".otrkey"):
                     log.info('try...{!s}'.format(file))
 
