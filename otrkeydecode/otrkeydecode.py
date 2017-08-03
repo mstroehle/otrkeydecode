@@ -43,11 +43,11 @@ def get_docker_host_ip(iface_name=None):
 
             """ successful ? """
             if process.returncode != 0:
-                log.error('can´t fetch host ip because: {}'.format(process.stderr.read()))
+                log.error('can´t fetch host ip because: {}'.format(process.stderr.read().decode('utf-8')))
                     
             else:
                 regex = r"inet\ addr:((\d{1,3}\.){1,3}\d{1,3})"
-                matched = re.findall(regex, process.stdout.read())         
+                matched = re.findall(regex, process.stdout.read().decode('utf-8'))         
                 return matched[0][0]
 
         except:
