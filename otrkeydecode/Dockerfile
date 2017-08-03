@@ -10,9 +10,11 @@ ENV LOG_LEVEL DEBUG
 ENV DECODE_INTERVAL 600
 ENV USE_DEST_SUBFOLDER True
 ENV USE_CUTLIST True
-ENV INDEX False
-ENV INDEX_COMMAND synoindex -a
-ENV INDEX_IFACE_NAME eth0
+ENV REMOTE_INDEX False
+ENV REMOTE_USER admin
+ENV REMOTE_PASS supersecret
+ENV REMOTE_INDEX_COMMAND synoindex -a
+ENV DOCKER_IFACE_NAME eth0
 
 # dirs & volumes
 # --------------------------------------------------------

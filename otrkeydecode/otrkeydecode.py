@@ -11,6 +11,9 @@ import urllib.request
 import configparser
 import re
 
+from pexpect import pxssh
+
+
 """ helper """
 def safe_cast(val, to_type, default=None):
     try:
@@ -89,19 +92,22 @@ def config_module():
     config['use_cutlists'] = safe_cast(os.environ.get('USE_CUTLIST'), bool, False)
     config['temp_path'] = '/tmp/'
 
-    config['use_index'] = safe_cast(os.environ.get('INDEX'), bool, False)
+    config['use_index'] = safe_cast(os.environ.get('REMOTE_INDEX'), bool, False)
 
     if config['use_index']:
 
-        config['iface_name'] = safe_cast(os.environ.get('INDEX_IFACE_NAME'), str, None)
-        config['index_command'] = safe_cast(os.environ.get('INDEX_COMMAND'), str, None)
+        config['iface_name'] = safe_cast(os.environ.get('DOCKER_IFACE_NAME'), str, None)
+        config['index_command'] = safe_cast(os.environ.get('REMOTE_INDEX_COMMAND'), str, None)
         config['hostip'] = get_docker_host_ip(config['iface_name'])
+        config['ssh_user'] = safe_cast(os.environ.get('REMOTE_USER'), str, None)
+        config['ssh_pass'] = safe_cast(os.environ.get('REMOTE_PASS'), str, None)
 
-        if config['hostip'] is None or config['index_command'] is None:
-            log.error('Can´t retrieve host ip for index new otr files on host. Check envars INDEX_IFACE_NAME and INDEX_COMMAND. Process will be terminated.')
+        if config['hostip'] is None or config['index_command'] is None or config['ssh_user'] is None or config['ssh_pass'] is None:
+            log.error('Can´t retrieve host ip for index new otr files on host. Check envars DOCKER_IFACE_NAME, REMOTE_INDEX_COMMAND, REMOTE_USER or REMOTE_PASS. Process will be terminated.')
             
             global stopsignal
             stopsignal = True
+        
         else:
             log.info('Host IP is {!s}'.format(config['hostip']))
 
@@ -238,7 +244,21 @@ class otrkey():
                 log.exception('Exception Traceback:')
 
     def index(self):
-        pass
+        if (self.use_index) and (not self.indexed) and (self.moved):
+            log.debug('try to index {} on host {}'.format(self.video_fullpath, self.hostip))
+
+            try:
+                s = pxssh.pxssh(options={"StrictHostKeyChecking": "no"})
+                s.login(self.hostip, self.ssh_user, self.ssh_pass)
+                s.sendline(index_command)   # run a command
+                s.prompt()                  # match the prompt
+                log.debug(s.before)        # print everything before the prompt.
+                s.logout()
+
+                self.indexed = True
+            except pxssh.ExceptionPxssh:
+                log.exception("pxssh failed on login.")
+
 
         
     def __init__(self, otrkey_file, data):
@@ -310,6 +330,7 @@ def main():
                     with otrkey(file, config) as otrkey_file:
                         otrkey_file.decode()
                         otrkey_file.move()
+                        otrkey_file.index()
 
             nextrun = datetime.utcnow() + timedelta(seconds=config['waitseconds'])
             log.info('next runtime in {!s} seconds at {!s}'.format(config['waitseconds'], nextrun))
