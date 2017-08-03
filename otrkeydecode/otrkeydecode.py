@@ -116,19 +116,19 @@ class otrkey():
                 elif os.path.exists(self.destination_path + '_' + fileparts[0]):
                     destful = self.destination_path + '_' + fileparts[0] + '/'
 
-                elif filename[0] in ['0', '1', '2', '3','4','5','6','7','8','9']:
+                elif self.source_file[0] in ['0', '1', '2', '3','4','5','6','7','8','9']:
                     destful = self.destination_path + '_1-9/'
 
-                elif filename[0].upper() in ['I', 'J']:
+                elif self.source_file[0].upper() in ['I', 'J']:
                     destful = self.destination_path + '_I-J/'
 
-                elif filename[0].upper() in ['N', 'O']:
+                elif self.source_file[0].upper() in ['N', 'O']:
                     destful = self.destination_path + '_N-O/'
 
-                elif filename[0].upper() in ['P', 'Q']:
+                elif self.source_file[0].upper() in ['P', 'Q']:
                     destful = self.destination_path + '_P-Q/'
                         
-                elif filename[0].upper() in ['U', 'V', 'W', 'X', 'Y', 'Z']:
+                elif self.source_file[0].upper() in ['U', 'V', 'W', 'X', 'Y', 'Z']:
                     destful = self.destination_path + '_U-Z/'
 
                 else:
