@@ -10,6 +10,9 @@ ENV LOG_LEVEL DEBUG
 ENV DECODE_INTERVAL 600
 ENV USE_DEST_SUBFOLDER True
 ENV USE_CUTLIST True
+ENV INDEX False
+ENV INDEX_COMMAND synoindex -a
+ENV INDEX_IFACE_NAME eth0
 
 # dirs & volumes
 # --------------------------------------------------------
@@ -35,6 +38,9 @@ RUN mkdir -p ~/bin \
 	&& ln -sf /otr/otrdecoder/otrdecoder ~/bin/otrdecoder \
 	&& ln -sf /otr/otrdecoder/otrdecoder /usr/bin/otrdecoder
 
+# install open ssh
+RUN apk update && \
+	apk add openssh
 
 # copy source
 # ------------------------------------------------------------

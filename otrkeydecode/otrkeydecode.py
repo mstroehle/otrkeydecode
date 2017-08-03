@@ -1,7 +1,7 @@
 import subprocess
 from datetime import datetime, timedelta
 import os
-from sys import stdout
+from sys import stdout, stderr
 
 import logging
 import logging.handlers
@@ -9,6 +9,7 @@ import logging.handlers
 import signal
 import urllib.request
 import configparser
+import re
 
 """ helper """
 def safe_cast(val, to_type, default=None):
@@ -29,6 +30,29 @@ def handler_stop_signals(signum, frame):
 
 signal.signal(signal.SIGINT, handler_stop_signals)
 signal.signal(signal.SIGTERM, handler_stop_signals)
+
+def get_docker_host_ip(iface_name=None):
+    if iface_name is None:
+        return None
+    else:
+        try:    
+            process_call = 'ifconfig ' + iface_name
+            log.debug('try to retrieve host ip with {}'.format(process_call))
+            process = subprocess.Popen(process_call, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            process.wait()
+
+            """ successful ? """
+            if process.returncode != 0:
+                log.error('can´t fetch host ip because: {}'.format(process.stderr.read()))
+                    
+            else:
+                regex = r"inet\ addr:((\d{1,3}\.){1,3}\d{1,3})"
+                matched = re.findall(regex, process.stdout.read())         
+                return matched[0][0]
+
+        except:
+            log.exception('Exception Traceback:')
+            return None
 
 """ Logging Configuration """    
 loglevel = safe_cast(os.environ.get('LOG_LEVEL'), str, 'INFO')
@@ -64,6 +88,22 @@ def config_module():
     config['use_subfolders'] = safe_cast(os.environ.get('USE_DEST_SUBFOLDER'), bool, False)
     config['use_cutlists'] = safe_cast(os.environ.get('USE_CUTLIST'), bool, False)
     config['temp_path'] = '/tmp/'
+
+    config['use_index'] = safe_cast(os.environ.get('INDEX'), bool, False)
+
+    if config['use_index']:
+
+        config['iface_name'] = safe_cast(os.environ.get('INDEX_IFACE_NAME'), str, None)
+        config['index_command'] = safe_cast(os.environ.get('INDEX_COMMAND'), str, None)
+        config['hostip'] = get_docker_host_ip(config['iface_name'])
+
+        if config['hostip'] is None or config['index_command'] is None:
+            log.error('Can´t retrieve host ip for index new otr files on host. Check envars INDEX_IFACE_NAME and INDEX_COMMAND. Process will be terminated.')
+            
+            global stopsignal
+            stopsignal = True
+        else:
+            log.info('Host IP is {!s}'.format(config['hostip']))
 
     return config
 
@@ -196,6 +236,10 @@ class otrkey():
             
             except:
                 log.exception('Exception Traceback:')
+
+    def index(self):
+        pass
+
         
     def __init__(self, otrkey_file, data):
 
@@ -217,6 +261,7 @@ class otrkey():
         
         self.decoded = False
         self.moved = False
+        self.indexed = False
 
         """ log otrkey data in debug mode """ 
         for key, value in vars(self).items():   
