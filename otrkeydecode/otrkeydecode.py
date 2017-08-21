@@ -118,7 +118,7 @@ class otrkey():
         try:
 
             if not self.use_subfolders:
-                return ''
+                return None
             
             else:
                 fileparts = self.source_file.split('_')
@@ -152,7 +152,7 @@ class otrkey():
 
         except:
             log.exception('Exception Traceback:')
-            return ''
+            return None
 
     def decode(self):
         """ decode file ------------------------------------------------------------"""
@@ -236,33 +236,6 @@ class otrkey():
             ftp.quit()
 
             self.moved = True
-
-
-
- 
-    def push_filesystem():
-        """ move decoded videofile to destination """
-        log.debug('try to move {} to filesystem {}'.format(self.video_temp_fullpath, self.video_fullpath))
-        
-        try:
-            process_call = 'mv ' + self.video_temp_fullpath + ' ' + self.video_fullpath
-            log.debug('moving file with linux call: {}'.format(process_call))
-            process = subprocess.Popen(process_call, shell=True, stdout=subprocess.PIPE)
-            process.wait()
-        
-            """ moving successful ? """
-            if process.returncode != 0:
-                log.error('moving failed with code {!s} and output {!s}'.format(process.returncode, process.stdout.read()))
-                    
-            else:
-                log.info('Moving succesfull with returncode {!s}.'.format(process.returncode))
-                return True
-            
-        except:
-            log.exception('Exception Traceback:')
-            return False
-
-
  
     def __init__(self, otrkey_file, data):
 
