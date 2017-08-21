@@ -69,7 +69,6 @@ def config_module():
     config['use_cutlists'] = safe_cast(os.environ.get('USE_CUTLIST'), bool, False)
     config['temp_path'] = '/tmp/'
 
-    config['use_ftp'] = safe_cast(os.environ.get('USE_FTP'), bool, False)
     config['ftp_user'] = safe_cast(os.environ.get('FTP_USER'), str, 'x@y.z')
     config['ftp_pass'] = safe_cast(os.environ.get('FTP_PASS'), str, 'supersecret')
     config['ftp_server'] = safe_cast(os.environ.get('FTP_SERVER'), str, 'ftp.something.com')
@@ -100,59 +99,77 @@ class otrkey():
                 cutlists.read_string(content)
     
                 """ download the first cutlist to file in /tmp """
-                url = cutlists['FILE1']['filename']
-                cutlist_file = os.path.join(self.temp_path, os.path.basename(url))
-                urllib.request.urlretrieve(url, cutlist_file)
+                if cutlists.has_option('FILE1','filename'):
+                    curlist_url = cutlists.get('FILE1','filename')
+                    cutlist_file = os.path.join(self.temp_path, os.path.basename(curlist_url))
+                    urllib.request.urlretrieve(curlist_url, cutlist_file)
             
-                """ success """
-                log.info('donloaded cutlist to {}...'.format(cutlist_file))
-                return cutlist_file
+                    """ success """
+                    log.info('donloaded cutlist to {}...'.format(cutlist_file))
+                    return cutlist_file
+                else:
+                    log.debug('no cutlist for {} file!'.format(self.source_file))
+                    return None
 
         except:
             log.exception('Exception Traceback:')
             return None
 
-    def get_subfolder(self):
+    def cwd_subfolder(self, ftp):
+        """ change ftp folder to an subfolder if exists """
         log.debug('retrieve output path for video....{}'.format(self.source_file))
     
-        try:
-
-            if not self.use_subfolders:
-                return None
+        if not self.use_subfolders:
+            return True
             
-            else:
+        else:
+
+            try:
+
+                """ retrieve directories in ftp folder """
+                items = []
+                ftp.retrlines('LIST', items.append ) 
+                items = map( str.split, items )
+                dirlist = [ item.pop() for item in items if item[0][0] == 'd' ]
+
                 fileparts = self.source_file.split('_')
 
-                if os.path.exists(self.destination_path + fileparts[0]):
-                    destful = fileparts[0] + '/'
+                if ('_' + fileparts[0] in dirlist):
+                    ftp.cwd('_' + fileparts[0])
+                    return True
+                
+                if (fileparts[0] in dirlist):
+                    ftp.cwd(fileparts[0])
+                    return True
 
-                elif os.path.exists(self.destination_path + '_' + fileparts[0]):
-                    destful = '_' + fileparts[0] + '/'
-
-                elif self.source_file[0] in ['0', '1', '2', '3','4','5','6','7','8','9']:
-                    destful = '_1-9/'
+                if self.source_file[0] in ['0', '1', '2', '3','4','5','6','7','8','9']:
+                    subdir = '_1-9'
 
                 elif self.source_file[0].upper() in ['I', 'J']:
-                    destful = '_I-J/'
+                    subdir = '_I-J'
 
                 elif self.source_file[0].upper() in ['N', 'O']:
-                    destful = '_N-O/'
+                    subdir = '_N-O'
 
                 elif self.source_file[0].upper() in ['P', 'Q']:
-                    destful = '_P-Q/'
+                    subdir = '_P-Q'
                         
                 elif self.source_file[0].upper() in ['U', 'V', 'W', 'X', 'Y', 'Z']:
-                    destful = '_U-Z/'
+                    subdir = '_U-Z'
 
                 else:
-                    destful = '_' + self.source_file[0].upper() + '/'
+                    subdir = '_' + self.source_file[0].upper() + '/'
 
+                if (subdir not in dirlist):
+                    ftp.mkd(subdir)
+                    log.debug("folder does not exitst, ftp.mkd: " + self.video_subfolder)                            
+                    
+                ftp.cwd(subdir)
+                return True
 
-                return destful
-
-        except:
-            log.exception('Exception Traceback:')
-            return None
+            except:
+                log.exception('Exception Traceback:')
+                return False
 
     def decode(self):
         """ decode file ------------------------------------------------------------"""
@@ -169,12 +186,12 @@ class otrkey():
                 
                 log.debug('decode call: {} !'.format(call))
 
-                process = subprocess.Popen(call, shell=True, stdout=subprocess.PIPE)
+                process = subprocess.Popen(call, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                 process.wait()
         
                 """ decoding successful ? """
                 if process.returncode != 0:
-                    log.error('decoding failed with code {!s} and output {!s}'.format(process.returncode, process.stdout.read()))
+                    log.error('decoding failed with code {!s} and output {!s}'.format(process.returncode, process.stderr.read()))
                     
                 else:
                     log.info('Decoding succesfull with returncode {!s}.'.format(process.returncode))
@@ -207,30 +224,15 @@ class otrkey():
                 return
 
             """ make subfolder if not exists """
-            if not self.video_subfolder is None:
+            if self.cwd_subfolder(ftp):
+
+                """ move file """
                 try:
-
-                        items = []
-                        ftp.retrlines('LIST', items.append ) 
-                        items = map( str.split, items )
-                        dirlist = [ item.pop() for item in items if item[0][0] == 'd' ]
-
-                        if not (self.video_subfolder in dirlist):
-                            ftp.mkd(self.video_subfolder)
-                            log.debug("folder does not exitst, ftp.mkd: " + self.video_subfolder)
+                    ftp.storbinary('STOR ' + self.video_file, open(self.video_temp_fullpath, 'rb'))
             
-                        ftp.cwd(self.video_subfolder)
-
                 except ftplib.error_perm:
                     log.debug('subfoulder not found/make: {}'.format(ftplib.error_perm))
                     return
-
-            """ move file """
-            try:
-                ftp.storbinary('STOR ' + self.video_file, open(self.video_temp_fullpath, 'rb'))
-            
-            except ftplib.error_perm:
-                log.debug('subfoulder not found/make: {}'.format(ftplib.error_perm))
 
             """ logout ftp session """
             ftp.quit()
@@ -250,7 +252,8 @@ class otrkey():
 
         self.cutlist_fullpath = self.get_cutlist()
 
-        self.video_subfolder = self.get_subfolder()
+        self.video_subfolder = None 
+        """ self.video_subfolder = self.get_subfolder()"""
         """ self.video_path = os.path.join(self.destination_path, self.video_subfolder) """
         self.video_file = os.path.splitext(os.path.basename(self.source_file))[0]
         """ self.video_fullpath = os.path.join(self.video_path, self.video_file) """
