@@ -3,7 +3,7 @@ MAINTAINER oliver@app-workshop.de
 
 # ARGs & ENVs
 # -------------------------------------------------------
-ENV OTR_DECODER otrdecoder-bin-64bit-linux-static-v519.tar.bz2
+ENV OTR_DECODER otrdecoder-bin-64bit-linux-static-v519
 ENV OTR_USER xy@z.com
 ENV OTR_PASS supersecret
 ENV LOG_LEVEL DEBUG
