@@ -91,8 +91,8 @@ class otrkey():
                 """ download list of cutlists into string """
                 url = 'http://www.onlinetvrecorder.com/getcutlistini.php?filename=' + self.source_file
                 response = urllib.request.urlopen(url)
-                content = str(response.read().decode('utf-8'))
-                log.debug(content)
+                content = str(response.read().decode('utf-8', 'ignore'))
+                #log.debug(content)
 
                 """ parse list of cutlists """
                 cutlists = configparser.ConfigParser(strict=False, allow_no_value=True)
@@ -186,7 +186,7 @@ class otrkey():
                 
                 log.debug('decode call: {} !'.format(call))
 
-                process = subprocess.Popen(call, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                process = subprocess.Popen(call, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 process.wait()
         
                 """ decoding successful ? """

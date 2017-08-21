@@ -3,7 +3,7 @@ MAINTAINER oliver@app-workshop.de
 
 # ARGs & ENVs
 # -------------------------------------------------------
-ENV OTR_DECODER otrdecoder-bin-i686-pc-linux-gnu-static-0.4.995
+ENV OTR_DECODER otrdecoder-bin-64bit-linux-static-v519.tar.bz2
 ENV OTR_USER xy@z.com
 ENV OTR_PASS supersecret
 ENV LOG_LEVEL DEBUG
@@ -16,6 +16,13 @@ ENV FTP_USER xyz
 ENV FTP_PASS supersecret
 ENV FTP_PATH /
 
+# Decoder
+# http://www.onlinetvrecorder.com/downloads/otrdecoder-bin-32bit-linux-static-v519.tar.bz2
+# http://www.onlinetvrecorder.com/downloads/otrdecoder-bin-64bit-linux-static-v519.tar.bz2
+# Easydecoder
+# http://www.onlinetvrecorder.com/downloads/qotrdecoder-linux-Ubuntu_8.04-i686-0.0.248-r1133.tar.bz2
+# http://www.onlinetvrecorder.com/downloads/otrdecoder-bin-x86_64-unknown-linux-gnu-0.4.1133.tar.bz2
+# otrdecoder-bin-i686-pc-linux-gnu-static-0.4.995
 
 # dirs & volumes
 # --------------------------------------------------------
