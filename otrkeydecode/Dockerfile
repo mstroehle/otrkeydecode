@@ -10,16 +10,18 @@ ENV LOG_LEVEL DEBUG
 ENV DECODE_INTERVAL 600
 ENV USE_DEST_SUBFOLDER True
 ENV USE_CUTLIST True
-ENV USE_FTP False
-ENV FTP_USER xy@z.com
+ENV FTP_SERVER ftp.something.com
+ENV FTP_PORT 21
+ENV FTP_USER xyz
 ENV FTP_PASS supersecret
+ENV FTP_PATH /
 
 
 # dirs & volumes
 # --------------------------------------------------------
 RUN mkdir -p /usr/src \
 	&& mkdir -p /usr/otrkey \
-	&& mkdir -p /usr/video \
+	#&& mkdir -p /usr/video \
 	&& mkdir -p /usr/otrdecoder \
 	&& mkdir -p /usr/log
 
@@ -39,10 +41,6 @@ RUN mkdir -p ~/bin \
 	&& ln -sf /otr/otrdecoder/otrdecoder ~/bin/otrdecoder \
 	&& ln -sf /otr/otrdecoder/otrdecoder /usr/bin/otrdecoder
 
-# install open ssh
-RUN apk update && \
-	apk add openssh
-
 # copy source
 # ------------------------------------------------------------
 WORKDIR /usr/src
@@ -56,7 +54,7 @@ RUN pip install --no-cache-dir -r /usr/src/requirements.txt
 VOLUME /usr/src/
 VOLUME /usr/log/
 VOLUME /usr/otrkey/
-VOLUME /usr/video/
+#VOLUME /usr/video/
 VOLUME /tmp/
 
 # Start/Stop

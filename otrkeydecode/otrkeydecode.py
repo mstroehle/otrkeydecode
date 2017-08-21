@@ -58,7 +58,7 @@ def config_module():
     config = {}
 
     config['source_path'] = '/usr/otrkey/'
-    config['destination_path'] = '/usr/video/'
+    #config['destination_path'] = '/usr/video/'
     config['otrdecoder_executable'] = '/usr/otrdecoder/otrdecoder'
 
     config['otr_user'] = safe_cast(os.environ.get('OTR_USER'), str, 'x@y.z')
@@ -71,7 +71,9 @@ def config_module():
 
     config['use_ftp'] = safe_cast(os.environ.get('USE_FTP'), bool, False)
     config['ftp_user'] = safe_cast(os.environ.get('FTP_USER'), str, 'x@y.z')
-    config['ftp_pass'] = safe_cast(os.environ.get('FTP_PASS'), str, 'supersecret')    
+    config['ftp_pass'] = safe_cast(os.environ.get('FTP_PASS'), str, 'supersecret')
+    config['ftp_server'] = safe_cast(os.environ.get('FTP_SERVER'), str, 'ftp.something.com')
+    config['ftp_path'] = safe_cast(os.environ.get('FTP_PATH'), str, '/')
     
     return config
 
@@ -145,10 +147,6 @@ class otrkey():
                 else:
                     destful = '_' + self.source_file[0].upper() + '/'
 
-                """
-                if not os.path.exists(destful[:-1]):
-                    os.mkdir(destful[:-1])
-                """
 
                 return destful
 
@@ -186,14 +184,60 @@ class otrkey():
                 log.exception('Exception Traceback:')
 
     def move(self):
-        """ move decoded videofile to destination """    
+        """ move decoded videofile to ftp destination """    
         if not self.moved and self.decoded:
             log.debug('try to move {} to {}'.format(self.video_temp_fullpath, self.video_fullpath))
 
-            if self.use_ftp:
-                self.moved = push_ftp()
-            else:
-                self.moved = push_filesystem()
+            """ login to ftp server """
+            try:
+                ftp = ftplib.FTP(host=self.ftp_server)
+                ftp.login(user=self.ftp_user, passwd=self.ftp_pass)
+            
+            except ftplib.error_perm:
+                log.debug('connection to ftp server failed: {}'.format(ftplib.error_perm))
+                return
+
+
+            """ check fpt_path exist ? """
+            try:
+                ftp.cwd(self.ftp_path)
+            
+            except ftplib.error_perm:
+                log.debug('sourcepath not found: {}'.format(ftplib.error_perm))
+                return
+
+            """ make subfolder if not exists """
+            if not self.video_subfolder is None:
+                try:
+
+                        items = []
+                        ftp.retrlines('LIST', items.append ) 
+                        items = map( str.split, items )
+                        dirlist = [ item.pop() for item in items if item[0][0] == 'd' ]
+
+                        if not (self.video_subfolder in dirlist):
+                            ftp.mkd(self.video_subfolder)
+                            log.debug("folder does not exitst, ftp.mkd: " + self.video_subfolder)
+            
+                        ftp.cwd(self.video_subfolder)
+
+                except ftplib.error_perm:
+                    log.debug('subfoulder not found/make: {}'.format(ftplib.error_perm))
+                    return
+
+            """ move file """
+            try:
+                ftp.storbinary('STOR ' + self.video_file, open(self.video_temp_fullpath, 'rb'))
+            
+            except ftplib.error_perm:
+                log.debug('subfoulder not found/make: {}'.format(ftplib.error_perm))
+
+            """ logout ftp session """
+            ftp.quit()
+
+            self.moved = True
+
+
 
  
     def push_filesystem():
@@ -218,17 +262,6 @@ class otrkey():
             log.exception('Exception Traceback:')
             return False
 
-    def push_ftp():
-        """ move decoded videofile to destination """
-        log.debug('try to move {} to filesystem {}'.format(self.video_temp_fullpath, self.video_fullpath))
-        
-        try:
-
-            return True
-            
-        except:
-            log.exception('Exception Traceback:')
-            return False
 
  
     def __init__(self, otrkey_file, data):
@@ -245,14 +278,13 @@ class otrkey():
         self.cutlist_fullpath = self.get_cutlist()
 
         self.video_subfolder = self.get_subfolder()
-        self.video_path = os.path.join(self.destination_path, self.video_subfolder)
+        """ self.video_path = os.path.join(self.destination_path, self.video_subfolder) """
         self.video_file = os.path.splitext(os.path.basename(self.source_file))[0]
-        self.video_fullpath = os.path.join(self.video_path, self.video_file)
+        """ self.video_fullpath = os.path.join(self.video_path, self.video_file) """
         self.video_temp_fullpath = os.path.join(self.temp_path, self.video_file)
         
         self.decoded = False
         self.moved = False
-        self.indexed = False
 
         """ log otrkey data in debug mode """ 
         for key, value in vars(self).items():   
