@@ -1,4 +1,5 @@
 import subprocess
+import ftplib
 from datetime import datetime, timedelta
 import os
 from sys import stdout, stderr
@@ -10,8 +11,6 @@ import signal
 import urllib.request
 import configparser
 import re
-
-from pexpect import pxssh
 
 
 """ helper """
@@ -34,28 +33,6 @@ def handler_stop_signals(signum, frame):
 signal.signal(signal.SIGINT, handler_stop_signals)
 signal.signal(signal.SIGTERM, handler_stop_signals)
 
-def get_docker_host_ip(iface_name=None):
-    if iface_name is None:
-        return None
-    else:
-        try:    
-            process_call = 'ifconfig ' + iface_name
-            log.debug('try to retrieve host ip with {}'.format(process_call))
-            process = subprocess.Popen(process_call, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            process.wait()
-
-            """ successful ? """
-            if process.returncode != 0:
-                log.error('can´t fetch host ip because: {}'.format(process.stderr.read().decode('utf-8')))
-                    
-            else:
-                regex = r"inet\ addr:((\d{1,3}\.){1,3}\d{1,3})"
-                matched = re.findall(regex, process.stdout.read().decode('utf-8'))         
-                return matched[0][0]
-
-        except:
-            log.exception('Exception Traceback:')
-            return None
 
 """ Logging Configuration """    
 loglevel = safe_cast(os.environ.get('LOG_LEVEL'), str, 'INFO')
@@ -70,7 +47,7 @@ filehandler = logging.handlers.RotatingFileHandler(logfilename, 1000000, 5)
 filehandler.setFormatter(formatter)
 filehandler.setLevel(loglevel)
 
-log = logging.getLogger(__name__) 
+log = logging.getLogger('otrkeydecode') 
 log.setLevel(loglevel)
 log.addHandler(consolehandler)
 log.addHandler(filehandler)
@@ -92,25 +69,10 @@ def config_module():
     config['use_cutlists'] = safe_cast(os.environ.get('USE_CUTLIST'), bool, False)
     config['temp_path'] = '/tmp/'
 
-    config['use_index'] = safe_cast(os.environ.get('REMOTE_INDEX'), bool, False)
-
-    if config['use_index']:
-
-        config['iface_name'] = safe_cast(os.environ.get('DOCKER_IFACE_NAME'), str, None)
-        config['index_command'] = safe_cast(os.environ.get('REMOTE_INDEX_COMMAND'), str, None)
-        config['hostip'] = get_docker_host_ip(config['iface_name'])
-        config['ssh_user'] = safe_cast(os.environ.get('REMOTE_USER'), str, None)
-        config['ssh_pass'] = safe_cast(os.environ.get('REMOTE_PASS'), str, None)
-
-        if config['hostip'] is None or config['index_command'] is None or config['ssh_user'] is None or config['ssh_pass'] is None:
-            log.error('Can´t retrieve host ip for index new otr files on host. Check envars DOCKER_IFACE_NAME, REMOTE_INDEX_COMMAND, REMOTE_USER or REMOTE_PASS. Process will be terminated.')
-            
-            global stopsignal
-            stopsignal = True
-        
-        else:
-            log.info('Host IP is {!s}'.format(config['hostip']))
-
+    config['use_ftp'] = safe_cast(os.environ.get('USE_FTP'), bool, False)
+    config['ftp_user'] = safe_cast(os.environ.get('FTP_USER'), str, 'x@y.z')
+    config['ftp_pass'] = safe_cast(os.environ.get('FTP_PASS'), str, 'supersecret')    
+    
     return config
 
 
@@ -148,49 +110,51 @@ class otrkey():
             log.exception('Exception Traceback:')
             return None
 
-    def get_videopath(self):
+    def get_subfolder(self):
         log.debug('retrieve output path for video....{}'.format(self.source_file))
     
         try:
 
             if not self.use_subfolders:
-                return self.destination_path
+                return ''
             
             else:
                 fileparts = self.source_file.split('_')
 
                 if os.path.exists(self.destination_path + fileparts[0]):
-                    destful = self.destination_path + fileparts[0] + '/'
+                    destful = fileparts[0] + '/'
 
                 elif os.path.exists(self.destination_path + '_' + fileparts[0]):
-                    destful = self.destination_path + '_' + fileparts[0] + '/'
+                    destful = '_' + fileparts[0] + '/'
 
                 elif self.source_file[0] in ['0', '1', '2', '3','4','5','6','7','8','9']:
-                    destful = self.destination_path + '_1-9/'
+                    destful = '_1-9/'
 
                 elif self.source_file[0].upper() in ['I', 'J']:
-                    destful = self.destination_path + '_I-J/'
+                    destful = '_I-J/'
 
                 elif self.source_file[0].upper() in ['N', 'O']:
-                    destful = self.destination_path + '_N-O/'
+                    destful = '_N-O/'
 
                 elif self.source_file[0].upper() in ['P', 'Q']:
-                    destful = self.destination_path + '_P-Q/'
+                    destful = '_P-Q/'
                         
                 elif self.source_file[0].upper() in ['U', 'V', 'W', 'X', 'Y', 'Z']:
-                    destful = self.destination_path + '_U-Z/'
+                    destful = '_U-Z/'
 
                 else:
-                    destful = self.destination_path + '_' + self.source_file[0].upper() + '/'
+                    destful = '_' + self.source_file[0].upper() + '/'
 
+                """
                 if not os.path.exists(destful[:-1]):
                     os.mkdir(destful[:-1])
+                """
 
                 return destful
 
         except:
             log.exception('Exception Traceback:')
-            return self.destination_path
+            return ''
 
     def decode(self):
         """ decode file ------------------------------------------------------------"""
@@ -225,42 +189,48 @@ class otrkey():
         """ move decoded videofile to destination """    
         if not self.moved and self.decoded:
             log.debug('try to move {} to {}'.format(self.video_temp_fullpath, self.video_fullpath))
+
+            if self.use_ftp:
+                self.moved = push_ftp()
+            else:
+                self.moved = push_filesystem()
+
+ 
+    def push_filesystem():
+        """ move decoded videofile to destination """
+        log.debug('try to move {} to filesystem {}'.format(self.video_temp_fullpath, self.video_fullpath))
         
-            try:
-                process_call = 'mv ' + self.video_temp_fullpath + ' ' + self.video_fullpath
-                log.debug('moving file with linux call: {}'.format(process_call))
-                process = subprocess.Popen(process_call, shell=True, stdout=subprocess.PIPE)
-                process.wait()
+        try:
+            process_call = 'mv ' + self.video_temp_fullpath + ' ' + self.video_fullpath
+            log.debug('moving file with linux call: {}'.format(process_call))
+            process = subprocess.Popen(process_call, shell=True, stdout=subprocess.PIPE)
+            process.wait()
         
-                """ moving successful ? """
-                if process.returncode != 0:
-                    log.error('moving failed with code {!s} and output {!s}'.format(process.returncode, process.stdout.read()))
+            """ moving successful ? """
+            if process.returncode != 0:
+                log.error('moving failed with code {!s} and output {!s}'.format(process.returncode, process.stdout.read()))
                     
-                else:
-                    log.info('Moving succesfull with returncode {!s}.'.format(process.returncode))
-                    self.moved = True
+            else:
+                log.info('Moving succesfull with returncode {!s}.'.format(process.returncode))
+                return True
             
-            except:
-                log.exception('Exception Traceback:')
+        except:
+            log.exception('Exception Traceback:')
+            return False
 
-    def index(self):
-        if (self.use_index) and (not self.indexed) and (self.moved):
-            log.debug('try to index {} on host {}'.format(self.video_fullpath, self.hostip))
-
-            try:
-                s = pxssh.pxssh(options={"StrictHostKeyChecking": "no"})
-                s.login(self.hostip, self.ssh_user, self.ssh_pass)
-                s.sendline(index_command)   # run a command
-                s.prompt()                  # match the prompt
-                log.debug(s.before)        # print everything before the prompt.
-                s.logout()
-
-                self.indexed = True
-            except pxssh.ExceptionPxssh:
-                log.exception("pxssh failed on login.")
-
-
+    def push_ftp():
+        """ move decoded videofile to destination """
+        log.debug('try to move {} to filesystem {}'.format(self.video_temp_fullpath, self.video_fullpath))
         
+        try:
+
+            return True
+            
+        except:
+            log.exception('Exception Traceback:')
+            return False
+
+ 
     def __init__(self, otrkey_file, data):
 
         """ parse data dictionary into instance var """
@@ -274,7 +244,8 @@ class otrkey():
 
         self.cutlist_fullpath = self.get_cutlist()
 
-        self.video_path = self.get_videopath()
+        self.video_subfolder = self.get_subfolder()
+        self.video_path = os.path.join(self.destination_path, self.video_subfolder)
         self.video_file = os.path.splitext(os.path.basename(self.source_file))[0]
         self.video_fullpath = os.path.join(self.video_path, self.video_file)
         self.video_temp_fullpath = os.path.join(self.temp_path, self.video_file)
@@ -330,7 +301,6 @@ def main():
                     with otrkey(file, config) as otrkey_file:
                         otrkey_file.decode()
                         otrkey_file.move()
-                        otrkey_file.index()
 
             nextrun = datetime.utcnow() + timedelta(seconds=config['waitseconds'])
             log.info('next runtime in {!s} seconds at {!s}'.format(config['waitseconds'], nextrun))

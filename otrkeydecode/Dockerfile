@@ -10,11 +10,10 @@ ENV LOG_LEVEL DEBUG
 ENV DECODE_INTERVAL 600
 ENV USE_DEST_SUBFOLDER True
 ENV USE_CUTLIST True
-ENV REMOTE_INDEX False
-ENV REMOTE_USER admin
-ENV REMOTE_PASS supersecret
-ENV REMOTE_INDEX_COMMAND synoindex -a
-ENV DOCKER_IFACE_NAME eth0
+ENV USE_FTP False
+ENV FTP_USER xy@z.com
+ENV FTP_PASS supersecret
+
 
 # dirs & volumes
 # --------------------------------------------------------
