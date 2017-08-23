@@ -34,23 +34,24 @@ signal.signal(signal.SIGINT, handler_stop_signals)
 signal.signal(signal.SIGTERM, handler_stop_signals)
 
 
-""" Logging Configuration """    
-loglevel = safe_cast(os.environ.get('LOG_LEVEL'), str, 'INFO')
-formatter = logging.Formatter('%(asctime)s | %(name)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s')
+""" Logging Configuration """
+log = logging.getLogger('otrkeydecode')
+def config_logger(log, loglevel):
+    formatter = logging.Formatter('%(asctime)s | %(name)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s')
 
-consolehandler = logging.StreamHandler(stdout)
-consolehandler.setFormatter(formatter)
-consolehandler.setLevel(loglevel)
+    consolehandler = logging.StreamHandler(stdout)
+    consolehandler.setFormatter(formatter)
+    consolehandler.setLevel(loglevel)
     
-logfilename = '/usr/log/otrkeydecoder.log'
-filehandler = logging.handlers.RotatingFileHandler(logfilename, 1000000, 5)
-filehandler.setFormatter(formatter)
-filehandler.setLevel(loglevel)
+    logfilename = '/usr/log/otrkeydecoder.log'
+    filehandler = logging.handlers.RotatingFileHandler(logfilename, 1000000, 5)
+    filehandler.setFormatter(formatter)
+    filehandler.setLevel(loglevel)
 
-log = logging.getLogger('otrkeydecode') 
-log.setLevel(loglevel)
-log.addHandler(consolehandler)
-log.addHandler(filehandler)
+    log.setLevel(loglevel)
+    log.addHandler(consolehandler)
+    log.addHandler(filehandler)
+
 
 """ Main configuration """
 def config_module():
@@ -58,14 +59,14 @@ def config_module():
     config = {}
 
     config['source_path'] = '/usr/otrkey/'
-    #config['destination_path'] = '/usr/video/'
-    config['otrdecoder_executable'] = '/usr/otrdecoder/otrdecoder'
+    config['loglevel'] = safe_cast(os.environ.get('LOG_LEVEL'), str, 'INFO')
+    config['otrdecoder_executable'] = 'otrdecoder'
 
     config['otr_user'] = safe_cast(os.environ.get('OTR_USER'), str, 'x@y.z')
     config['otr_pass'] = safe_cast(os.environ.get('OTR_PASS'), str, 'supersecret')
 
     config['waitseconds'] = safe_cast(os.environ.get('DECODE_INTERVAL'),int, 3600)
-    config['use_subfolders'] = safe_cast(os.environ.get('USE_DEST_SUBFOLDER'), bool, False)
+    config['use_subfolders'] = safe_cast(os.environ.get('USE_SUBFOLDERS'), bool, False)
     config['use_cutlists'] = safe_cast(os.environ.get('USE_CUTLIST'), bool, False)
     config['temp_path'] = '/tmp/'
 
@@ -105,10 +106,10 @@ class otrkey():
                     urllib.request.urlretrieve(curlist_url, cutlist_file)
             
                     """ success """
-                    log.info('donloaded cutlist to {}...'.format(cutlist_file))
+                    log.info('downloaded cutlist to {}...'.format(cutlist_file))
                     return cutlist_file
                 else:
-                    log.debug('no cutlist for {} file!'.format(self.source_file))
+                    log.info('no cutlist for {} file!'.format(self.source_file))
                     return None
 
         except:
@@ -117,59 +118,54 @@ class otrkey():
 
     def cwd_subfolder(self, ftp):
         """ change ftp folder to an subfolder if exists """
-        log.debug('retrieve output path for video....{}'.format(self.source_file))
-    
-        if not self.use_subfolders:
-            return True
-            
-        else:
+        log.debug('change ftp folder to an subfolder if exists...'.format(self.source_file))
 
-            try:
+        try:
 
-                """ retrieve directories in ftp folder """
-                items = []
-                ftp.retrlines('LIST', items.append ) 
-                items = map( str.split, items )
-                dirlist = [ item.pop() for item in items if item[0][0] == 'd' ]
+            """ retrieve directories in ftp folder """
+            items = []
+            ftp.retrlines('LIST', items.append ) 
+            items = map( str.split, items )
+            dirlist = [ item.pop() for item in items if item[0][0] == 'd' ]
 
-                fileparts = self.source_file.split('_')
+            fileparts = self.source_file.split('_')
 
-                if ('_' + fileparts[0] in dirlist):
-                    ftp.cwd('_' + fileparts[0])
-                    return True
+            if ('_' + fileparts[0] in dirlist):
+                ftp.cwd('_' + fileparts[0])
+                return True
                 
-                if (fileparts[0] in dirlist):
-                    ftp.cwd(fileparts[0])
-                    return True
-
-                if self.source_file[0] in ['0', '1', '2', '3','4','5','6','7','8','9']:
-                    subdir = '_1-9'
-
-                elif self.source_file[0].upper() in ['I', 'J']:
-                    subdir = '_I-J'
-
-                elif self.source_file[0].upper() in ['N', 'O']:
-                    subdir = '_N-O'
-
-                elif self.source_file[0].upper() in ['P', 'Q']:
-                    subdir = '_P-Q'
-                        
-                elif self.source_file[0].upper() in ['U', 'V', 'W', 'X', 'Y', 'Z']:
-                    subdir = '_U-Z'
-
-                else:
-                    subdir = '_' + self.source_file[0].upper() + '/'
-
-                if (subdir not in dirlist):
-                    ftp.mkd(subdir)
-                    log.debug("folder does not exitst, ftp.mkd: " + self.video_subfolder)                            
-                    
-                ftp.cwd(subdir)
+            if (fileparts[0] in dirlist):
+                ftp.cwd(fileparts[0])
                 return True
 
-            except:
-                log.exception('Exception Traceback:')
-                return False
+            if self.source_file[0] in ['0', '1', '2', '3','4','5','6','7','8','9']:
+                subdir = '_1-9'
+
+            elif self.source_file[0].upper() in ['I', 'J']:
+                subdir = '_I-J'
+
+            elif self.source_file[0].upper() in ['N', 'O']:
+                subdir = '_N-O'
+
+            elif self.source_file[0].upper() in ['P', 'Q']:
+                subdir = '_P-Q'
+                        
+            elif self.source_file[0].upper() in ['U', 'V', 'W', 'X', 'Y', 'Z']:
+                subdir = '_U-Z'
+
+            else:
+                subdir = '_' + self.source_file[0].upper()
+
+            if (subdir not in dirlist):
+                ftp.mkd(subdir)
+                log.debug("folder does not exitst, ftp.mkd: " + self.video_subfolder)                            
+                    
+            ftp.cwd(subdir)
+            return True
+
+        except:
+            log.exception('Exception Traceback:')
+            return False
 
     def decode(self):
         """ decode file ------------------------------------------------------------"""
@@ -203,12 +199,16 @@ class otrkey():
     def move(self):
         """ move decoded videofile to ftp destination """    
         if not self.moved and self.decoded:
-            log.debug('try to move {} to {}'.format(self.video_temp_fullpath, self.video_fullpath))
+            log.debug('try to move {} to ftp.//{}'.format(self.video_temp_fullpath, self.ftp_server))
 
             """ login to ftp server """
             try:
                 ftp = ftplib.FTP(host=self.ftp_server)
                 ftp.login(user=self.ftp_user, passwd=self.ftp_pass)
+                if self.loglevel == 'DEBUG':
+                    ftp.set_debuglevel = 2
+                else:
+                    ftp.set_debuglevel = 1
             
             except ftplib.error_perm:
                 log.debug('connection to ftp server failed: {}'.format(ftplib.error_perm))
@@ -234,10 +234,11 @@ class otrkey():
                     log.debug('subfoulder not found/make: {}'.format(ftplib.error_perm))
                     return
 
-            """ logout ftp session """
-            ftp.quit()
+                self.moved = True
+                log.info('{} successfully moved to ftp {}'.format(self.video_file, self.ftp_server))
 
-            self.moved = True
+            """ logout ftp session """
+            ftp.quit()   
  
     def __init__(self, otrkey_file, data):
 
@@ -249,12 +250,7 @@ class otrkey():
         """ initiate instance members """
         self.source_file = otrkey_file
         self.source_fullpath = os.path.join(self.source_path, self.source_file)
-
         self.cutlist_fullpath = self.get_cutlist()
-
-        self.video_subfolder = None 
-        """ self.video_subfolder = self.get_subfolder()"""
-        """ self.video_path = os.path.join(self.destination_path, self.video_subfolder) """
         self.video_file = os.path.splitext(os.path.basename(self.source_file))[0]
         """ self.video_fullpath = os.path.join(self.video_path, self.video_file) """
         self.video_temp_fullpath = os.path.join(self.temp_path, self.video_file)
@@ -262,9 +258,8 @@ class otrkey():
         self.decoded = False
         self.moved = False
 
-        """ log otrkey data in debug mode """ 
-        for key, value in vars(self).items():   
-            log.debug('otrkey {} - member: {} = {!s}'.format(self.source_file, key, value))
+        log.info('operate {}'.format(self.video_file))
+
 
     def __enter__(self):
         return self
@@ -272,7 +267,7 @@ class otrkey():
     def __exit__(self, exc_type, exc_value, traceback):
         """ clean up files """
         if self.moved:       
-            log.debug('cleanup {}'.format(self.source_file))
+            log.debug('try cleanup {}'.format(self.source_file))
             try:
 
                 if os.path.exists(self.cutlist_fullpath):
@@ -284,6 +279,8 @@ class otrkey():
                 if os.path.exists(self.source_fullpath):
                     os.remove(self.source_fullpath)
 
+                log.info('cleanup successful for {}'.format(self.source_file))
+
             except:
                 log.exception('exception on {!s}'.format(__name__))
 
@@ -292,7 +289,13 @@ def main():
     log.info('otrkey decoder start main....')
 
     config = config_module()
+    config_logger(log, config['loglevel'])
     nextrun =  datetime.utcnow()
+
+    """ log configuration in debug mode """
+    if config['loglevel'] == 'DEBUG':
+        for key, value in config.items():   
+            log.debug('otrkeydecoder configuration: {} = {!s}'.format(key, value))
 
     """ run until stopsignal """
     while not stopsignal:
