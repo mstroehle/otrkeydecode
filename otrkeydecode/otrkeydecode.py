@@ -1,7 +1,7 @@
 import subprocess
 import ftplib
 from datetime import datetime, timedelta
-import os
+import os, fnmatch
 from sys import stdout, stderr
 
 import logging
@@ -16,10 +16,15 @@ import re
 """ helper """
 def safe_cast(val, to_type, default=None):
     try:
+        result = None
         if val is None:
-            return default
+            result = default
         else:
-            return to_type(val)
+            if to_type is bool:
+                result = str(val).lower() in ("yes", "true", "t", "1")
+            else:
+                result = to_type(val)
+        return result
         
     except (ValueError, TypeError):
         return default
@@ -51,7 +56,6 @@ def config_logger(log, loglevel):
     log.setLevel(loglevel)
     log.addHandler(consolehandler)
     log.addHandler(filehandler)
-
 
 """ Main configuration """
 def config_module():
@@ -86,14 +90,20 @@ class otrkey():
         log.debug('retrieve cutlist for {} file!'.format(self.source_file))
 
         try:
-            if not self.use_cutlists:
-                return None
+
+            """ Is cutlist already in tmp folder ? """
+            pattern = str(self.video_file).split('_TVOON_')[0] + '*.cutlist'
+            log.debug('looking for existing cutlist with pattern: {}'.format(pattern))
+            match = fnmatch.filter(os.listdir(self.temp_path), pattern)
+            if match:
+                cutlist_file = os.path.join(self.temp_path, match[0])
+                return cutlist_file
+
             else:
                 """ download list of cutlists into string """
                 url = 'http://www.onlinetvrecorder.com/getcutlistini.php?filename=' + self.source_file
                 response = urllib.request.urlopen(url)
                 content = str(response.read().decode('utf-8', 'ignore'))
-                #log.debug(content)
 
                 """ parse list of cutlists """
                 cutlists = configparser.ConfigParser(strict=False, allow_no_value=True)
@@ -175,23 +185,30 @@ class otrkey():
     
             try:
                
-                call = self.otrdecoder_executable + ' -i ' + self.source_fullpath + ' -o ' + self.temp_path + ' -e ' + self.otr_user + ' -p ' + self.otr_pass + ' -f'
-                
-                if not self.cutlist_fullpath is None:
-                        call = call + ' -C ' + self.cutlist_fullpath
-                
-                log.debug('decode call: {} !'.format(call))
-
-                process = subprocess.Popen(call, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                process.wait()
-        
-                """ decoding successful ? """
-                if process.returncode != 0:
-                    log.error('decoding failed with code {!s} and output {!s}'.format(process.returncode, process.stderr.read()))
-                    
-                else:
-                    log.info('Decoding succesfull with returncode {!s}.'.format(process.returncode))
+                if os.path.exists(self.video_temp_fullpath):
+                    log.info('Already decoded in former session: {!s}.'.format(self.video_temp_fullpath))
                     self.decoded = True
+                else:
+
+                    call = self.otrdecoder_executable + ' -i ' + self.source_fullpath + ' -o ' + self.temp_path + ' -e ' + self.otr_user + ' -p ' + self.otr_pass + ' -f'
+                
+                    if self.use_cutlist:
+                        self.cutlist_fullpath = get_cutlist()
+                        if not self.cutlist_fullpath is None:
+                                call = call + ' -C ' + self.cutlist_fullpath
+                
+                    log.debug('decode call: {} !'.format(call))
+
+                    process = subprocess.Popen(call, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    process.wait()
+        
+                    """ decoding successful ? """
+                    if process.returncode != 0:
+                        log.error('decoding failed with code {!s} and output {!s}'.format(process.returncode, process.stderr.read()))
+                    
+                    else:
+                        log.info('Decoding succesfull with returncode {!s}.'.format(process.returncode))
+                        self.decoded = True
 
             except:
                 log.exception('Exception Traceback:')
@@ -250,16 +267,14 @@ class otrkey():
         """ initiate instance members """
         self.source_file = otrkey_file
         self.source_fullpath = os.path.join(self.source_path, self.source_file)
-        self.cutlist_fullpath = self.get_cutlist()
+        self.cutlist_fullpath = None
         self.video_file = os.path.splitext(os.path.basename(self.source_file))[0]
-        """ self.video_fullpath = os.path.join(self.video_path, self.video_file) """
         self.video_temp_fullpath = os.path.join(self.temp_path, self.video_file)
         
         self.decoded = False
         self.moved = False
 
         log.info('operate {}'.format(self.video_file))
-
 
     def __enter__(self):
         return self
@@ -286,12 +301,13 @@ class otrkey():
 
 """ Main """
 def main():
-    log.info('otrkey decoder start main....')
-
+    
+    """ configuration """
     config = config_module()
     config_logger(log, config['loglevel'])
     nextrun =  datetime.utcnow()
-
+    log.info('otrkey decoder start main....')
+    
     """ log configuration in debug mode """
     if config['loglevel'] == 'DEBUG':
         for key, value in config.items():   
