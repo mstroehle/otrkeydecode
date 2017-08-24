@@ -159,6 +159,7 @@ RUN \
 
 VOLUME /usr/src/
 VOLUME /usr/log/
+VOLUME /tmp/
 VOLUME /usr/otrkey/	
 	
 # install pip requirements	

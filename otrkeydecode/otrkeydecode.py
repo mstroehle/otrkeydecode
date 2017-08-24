@@ -192,8 +192,8 @@ class otrkey():
 
                     call = self.otrdecoder_executable + ' -i ' + self.source_fullpath + ' -o ' + self.temp_path + ' -e ' + self.otr_user + ' -p ' + self.otr_pass + ' -f'
                 
-                    if self.use_cutlist:
-                        self.cutlist_fullpath = get_cutlist()
+                    if self.use_cutlists:
+                        self.cutlist_fullpath = self.get_cutlist()
                         if not self.cutlist_fullpath is None:
                                 call = call + ' -C ' + self.cutlist_fullpath
                 
