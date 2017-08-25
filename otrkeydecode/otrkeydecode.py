@@ -49,7 +49,7 @@ def config_logger(log, loglevel):
     consolehandler.setLevel(loglevel)
     
     logfilename = '/usr/log/otrkeydecoder.log'
-    filehandler = logging.handlers.RotatingFileHandler(logfilename, 1000000, 5)
+    filehandler = logging.handlers.RotatingFileHandler(logfilename, 10240, 5)
     filehandler.setFormatter(formatter)
     filehandler.setLevel(loglevel)
 
@@ -77,6 +77,7 @@ def config_module():
     config['ftp_user'] = safe_cast(os.environ.get('FTP_USER'), str, 'x@y.z')
     config['ftp_pass'] = safe_cast(os.environ.get('FTP_PASS'), str, 'supersecret')
     config['ftp_server'] = safe_cast(os.environ.get('FTP_SERVER'), str, 'ftp.something.com')
+    config['ftp_port'] = safe_cast(os.environ.get('FTP_PORT'), int, 21)
     config['ftp_path'] = safe_cast(os.environ.get('FTP_PATH'), str, '/')
     
     return config
@@ -188,8 +189,8 @@ class otrkey():
                 if os.path.exists(self.video_temp_fullpath):
                     log.info('Already decoded in former session: {!s}.'.format(self.video_temp_fullpath))
                     self.decoded = True
+                
                 else:
-
                     call = self.otrdecoder_executable + ' -i ' + self.source_fullpath + ' -o ' + self.temp_path + ' -e ' + self.otr_user + ' -p ' + self.otr_pass + ' -f'
                 
                     if self.use_cutlists:
@@ -218,44 +219,34 @@ class otrkey():
         if not self.moved and self.decoded:
             log.debug('try to move {} to ftp.//{}'.format(self.video_temp_fullpath, self.ftp_server))
 
-            """ login to ftp server """
             try:
-                ftp = ftplib.FTP(host=self.ftp_server)
-                ftp.login(user=self.ftp_user, passwd=self.ftp_pass)
+                
+                """ login to ftp server """
+                ftp = ftplib.FTP
                 if self.loglevel == 'DEBUG':
                     ftp.set_debuglevel = 2
                 else:
                     ftp.set_debuglevel = 1
-            
-            except ftplib.error_perm:
-                log.debug('connection to ftp server failed: {}'.format(ftplib.error_perm))
-                return
 
-
-            """ check fpt_path exist ? """
-            try:
+                ftp.connect(host=self.ftp_server, port=self.ftp_port)
+                ftp.login(user=self.ftp_user, passwd=self.ftp_pass)
+      
+                """ check fpt_path exist ? """
                 ftp.cwd(self.ftp_path)
             
-            except ftplib.error_perm:
-                log.debug('sourcepath not found: {}'.format(ftplib.error_perm))
-                return
+                """ make subfolder if not exists """
+                if self.cwd_subfolder(ftp):
 
-            """ make subfolder if not exists """
-            if self.cwd_subfolder(ftp):
-
-                """ move file """
-                try:
+                    """ move file """
                     ftp.storbinary('STOR ' + self.video_file, open(self.video_temp_fullpath, 'rb'))
-            
-                except ftplib.error_perm:
-                    log.debug('subfoulder not found/make: {}'.format(ftplib.error_perm))
-                    return
+                    self.moved = True
+                    log.info('{} successfully moved to ftp {}'.format(self.video_file, self.ftp_server))
 
-                self.moved = True
-                log.info('{} successfully moved to ftp {}'.format(self.video_file, self.ftp_server))
-
-            """ logout ftp session """
-            ftp.quit()   
+                """ logout ftp session """
+                ftp.quit()
+                
+            except ftplib.all_errors as e:
+                log.error('{!s}'.format(e))
  
     def __init__(self, otrkey_file, data):
 
