@@ -92,15 +92,18 @@ class otrkey():
 
         try:
 
+            cutlist_file = None
+
             """ Is cutlist already in tmp folder ? """
             pattern = str(self.video_file).split('_TVOON_')[0] + '*.cutlist'
-            log.debug('looking for existing cutlist with pattern: {}'.format(pattern))
+            
             match = fnmatch.filter(os.listdir(self.temp_path), pattern)
-            if match:
-                cutlist_file = os.path.join(self.temp_path, match[0])
-                return cutlist_file
+            for file in match:
+                cutlist_file = os.path.join(self.temp_path, file)
+                log.info('Already existing cutlist: {}'.format(cutlist_file))
+                break
 
-            else:
+            if cutlist_file is None:
                 """ download list of cutlists into string """
                 url = 'http://www.onlinetvrecorder.com/getcutlistini.php?filename=' + self.source_file
                 response = urllib.request.urlopen(url)
@@ -118,10 +121,11 @@ class otrkey():
             
                     """ success """
                     log.info('downloaded cutlist to {}...'.format(cutlist_file))
-                    return cutlist_file
+                    
                 else:
                     log.info('no cutlist for {} file!'.format(self.source_file))
-                    return None
+
+            return cutlist_file                  
 
         except:
             log.exception('Exception Traceback:')
@@ -222,13 +226,13 @@ class otrkey():
             try:
                 
                 """ login to ftp server """
-                ftp = ftplib.FTP
+                ftp = ftplib.FTP()
                 if self.loglevel == 'DEBUG':
                     ftp.set_debuglevel = 2
                 else:
                     ftp.set_debuglevel = 1
 
-                ftp.connect(host=self.ftp_server, port=self.ftp_port)
+                ftp.connect(self.ftp_server, self.ftp_port)
                 ftp.login(user=self.ftp_user, passwd=self.ftp_pass)
       
                 """ check fpt_path exist ? """
@@ -246,7 +250,7 @@ class otrkey():
                 ftp.quit()
                 
             except ftplib.all_errors as e:
-                log.error('{!s}'.format(e))
+                log.error('Error in ftp session ({!s}:{!s}) = {!s}'.format(self.ftp_server, self.ftp_port, e))
  
     def __init__(self, otrkey_file, data):
 
@@ -276,14 +280,18 @@ class otrkey():
             log.debug('try cleanup {}'.format(self.source_file))
             try:
 
-                if os.path.exists(self.cutlist_fullpath):
-                    os.remove(self.cutlist_fullpath)
+                pattern = str(self.video_file).split('_TVOON_')[0] + '*.cutlist'
+                match = fnmatch.filter(os.listdir(self.temp_path), pattern)
+                for file in match:
+                    os.remove(os.path.join(self.temp_path, file))
 
-                if os.path.exists(self.video_temp_fullpath):
-                    os.remove(self.video_temp_fullpath)
-
-                if os.path.exists(self.source_fullpath):
-                    os.remove(self.source_fullpath)
+                if not self.video_temp_fullpath is None:
+                    if os.path.exists(self.video_temp_fullpath):
+                        os.remove(self.video_temp_fullpath)
+                
+                if not self.source_fullpath is None:
+                    if os.path.exists(self.source_fullpath):
+                        os.remove(self.source_fullpath)
 
                 log.info('cleanup successful for {}'.format(self.source_file))
 
