@@ -1,2 +1,2 @@
 # otrkeydecode
-docker image including otr standard decoder to decode *.otrkey files
+docker image including otr easy decoder to decode *.otrkey files
